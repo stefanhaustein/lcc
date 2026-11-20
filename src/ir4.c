@@ -578,35 +578,35 @@ static void emit_node(Node p) {
 		emit_node(p->kids[0]);
 		emit_node(p->kids[1]);
 		if (ot == F) {
-			if (g == EQ) ir4_printf(" f==");
-			else if (g == NE) ir4_printf(" f!=");
+			if (g == EQ) ir4_printf(" f=");
+			else if (g == NE) ir4_printf(" f<>");
 			else if (g == LT) ir4_printf(" f<");
 			else if (g == GT) ir4_printf(" f>");
-			else if (g == LE) ir4_printf(" f> 0 ==");
-			else if (g == GE) ir4_printf(" f< 0 ==");
+			else if (g == LE) ir4_printf(" f> 0 =");
+			else if (g == GE) ir4_printf(" f< 0 =");
 		} else if (ot == P) {
-			if (g == EQ) ir4_printf(" a==");
-			else if (g == NE) ir4_printf(" a!=");
+			if (g == EQ) ir4_printf(" a=");
+			else if (g == NE) ir4_printf(" a<>");
 			else if (g == LT) ir4_printf(" a<");
 			else if (g == GT) ir4_printf(" a>");
-			else if (g == LE) ir4_printf(" a> 0 ==");
-			else if (g == GE) ir4_printf(" a< 0 ==");
+			else if (g == LE) ir4_printf(" a> 0 =");
+			else if (g == GE) ir4_printf(" a< 0 =");
 		} else if (is_i32_op(op)) {
-			if (g == EQ) ir4_printf(" i32==");
-			else if (g == NE) ir4_printf(" i32!=");
+			if (g == EQ) ir4_printf(" i32=");
+			else if (g == NE) ir4_printf(" i32<>");
 			else if (g == LT) ir4_printf(ot == U ? " u32<" : " i32<");
 			else if (g == GT) ir4_printf(ot == U ? " u32>" : " i32>");
 			else if (g == LE) ir4_printf(ot == U ? " u32<=" : " i32<=");
 			else if (g == GE) ir4_printf(ot == U ? " u32>=" : " i32>=");
 		} else {
-			if (g == EQ) ir4_printf(" ==");
-			else if (g == NE) ir4_printf(" !=");
+			if (g == EQ) ir4_printf(" =");
+			else if (g == NE) ir4_printf(" <>");
 			else if (g == LT) ir4_printf(ot == U ? " u<" : " <");
 			else if (g == GT) ir4_printf(ot == U ? " u>" : " >");
 			else if (g == LE) ir4_printf(ot == U ? " u<=" : " <=");
 			else if (g == GE) ir4_printf(ot == U ? " u>=" : " >=");
 		}
-		ir4_printf(" 0 == jz %s", ir4_symname(p->syms[0]));
+		ir4_printf(" 0 = jz %s", ir4_symname(p->syms[0]));
 		return;
 	}
 	assert(0);
@@ -666,17 +666,34 @@ static void I(function)(Symbol f, Symbol caller[], Symbol callee[], int ncalls) 
 	cur_buf = &code_buf;
 
 	total_locals = maxoffset + cur_fn_va_max;
-	sb_printf(&code_buf, "\nfn %s (", ir4_symname(f));
-	for (i = 0; caller[i] && callee[i]; i++) {
-		sb_printf(&code_buf, " p%d %s", i, ir4_type_str(caller[i]->type));
+	{
+		char sig[1024];
+		size_t pos = 0;
+		int seen = 0;
+		pos += (size_t)sprintf(sig + pos, "%s (", ir4_symname(f));
+		for (i = 0; caller[i] && callee[i]; i++) {
+			pos += (size_t)sprintf(sig + pos, " p%d %s", i, ir4_type_str(caller[i]->type));
+		}
+		if (is_va) {
+			pos += (size_t)sprintf(sig + pos, " p_va :a");
+		}
+		if (!ret_void) {
+			pos += (size_t)sprintf(sig + pos, " -> %s", ir4_type_str(rty));
+		}
+		sprintf(sig + pos, " )");
+		for (i = 0; i < fwd_emitted_cnt; i++) {
+			if (fwd_emitted[i] == f) {
+				seen = 1;
+				break;
+			}
+		}
+		if (!seen) {
+			if (fwd_emitted_cnt < 256)
+				fwd_emitted[fwd_emitted_cnt++] = f;
+			sb_printf(&fwd_buf, "fwd %s\n", sig);
+		}
+		sb_printf(&code_buf, "\nfn %s\n", sig);
 	}
-	if (is_va) {
-		sb_printf(&code_buf, " p_va :a");
-	}
-	if (!ret_void) {
-		sb_printf(&code_buf, " -> %s", ir4_type_str(rty));
-	}
-	sb_printf(&code_buf, " )\n");
 	if (total_locals > 0) {
 		sb_printf(&code_buf, "  var _locals :bytes %d\n", total_locals);
 	}
