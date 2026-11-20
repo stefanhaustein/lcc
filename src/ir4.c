@@ -1,3 +1,7 @@
+/*
+ * IR4th backend for lcc: emits IR4th source (.ir4) requiring "c.ir4".
+ * Targets: ir4 (16-bit), ir4/32 (32-bit), ir4/64 (64-bit).
+ */
 #include "c.h"
 
 #define I(f) ir4_##f
@@ -170,10 +174,26 @@ static void I(address)(Symbol q, Symbol p, long n) {
 	q->x.offset = p->x.offset + n;
 }
 
+static void format_fn_sig(char *out, Symbol f, Symbol params[], Type *proto, int is_va, Type rty) {
+	int i;
+	size_t pos = (size_t)sprintf(out, "%s (", ir4_symname(f));
+	if (params) {
+		for (i = 0; params[i]; i++)
+			pos += (size_t)sprintf(out + pos, " p%d %s", i, ir4_type_str(params[i]->type));
+	} else if (proto) {
+		for (i = 0; proto[i] && proto[i] != voidtype; i++)
+			pos += (size_t)sprintf(out + pos, " p%d %s", i, ir4_type_str(proto[i]));
+	}
+	if (is_va)
+		pos += (size_t)sprintf(out + pos, " p_va :a");
+	if (rty != voidtype)
+		pos += (size_t)sprintf(out + pos, " -> %s", ir4_type_str(rty));
+	sprintf(out + pos, " )");
+}
+
 static void emit_fwd_for(Symbol p) {
 	int i;
-	Type *proto;
-	Type rty;
+	char sig[1024];
 	if (!p || !isfunc(p->type)) return;
 	for (i = 0; i < fwd_emitted_cnt; i++) {
 		if (fwd_emitted[i] == p) return;
@@ -181,21 +201,8 @@ static void emit_fwd_for(Symbol p) {
 	if (fwd_emitted_cnt < 256) {
 		fwd_emitted[fwd_emitted_cnt++] = p;
 	}
-	proto = p->type->u.f.proto;
-	rty = freturn(p->type);
-	sb_printf(&fwd_buf, "fwd %s (", ir4_symname(p));
-	if (proto) {
-		for (i = 0; proto[i] && proto[i] != voidtype; i++) {
-			sb_printf(&fwd_buf, " p%d %s", i, ir4_type_str(proto[i]));
-		}
-	}
-	if (variadic(p->type)) {
-		sb_printf(&fwd_buf, " p_va :a");
-	}
-	if (rty != voidtype) {
-		sb_printf(&fwd_buf, " -> %s", ir4_type_str(rty));
-	}
-	sb_printf(&fwd_buf, " )\n");
+	format_fn_sig(sig, p, NULL, p->type->u.f.proto, variadic(p->type), freturn(p->type));
+	sb_printf(&fwd_buf, "fwd %s\n", sig);
 }
 
 static void I(defaddress)(Symbol p) {
@@ -668,19 +675,8 @@ static void I(function)(Symbol f, Symbol caller[], Symbol callee[], int ncalls) 
 	total_locals = maxoffset + cur_fn_va_max;
 	{
 		char sig[1024];
-		size_t pos = 0;
 		int seen = 0;
-		pos += (size_t)sprintf(sig + pos, "%s (", ir4_symname(f));
-		for (i = 0; caller[i] && callee[i]; i++) {
-			pos += (size_t)sprintf(sig + pos, " p%d %s", i, ir4_type_str(caller[i]->type));
-		}
-		if (is_va) {
-			pos += (size_t)sprintf(sig + pos, " p_va :a");
-		}
-		if (!ret_void) {
-			pos += (size_t)sprintf(sig + pos, " -> %s", ir4_type_str(rty));
-		}
-		sprintf(sig + pos, " )");
+		format_fn_sig(sig, f, caller, NULL, is_va, rty);
 		for (i = 0; i < fwd_emitted_cnt; i++) {
 			if (fwd_emitted[i] == f) {
 				seen = 1;

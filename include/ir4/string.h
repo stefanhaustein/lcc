@@ -10,7 +10,8 @@
 typedef unsigned int size_t;
 #endif
 
-extern void *memcpy(void *dst, const void *src, size_t len);
+extern void *__c_memcpy(void *dst, const void *src, size_t len);
+#define memcpy(d, s, n) __c_memcpy((d), (s), (n))
 extern void *memset(void *dst, int val, size_t len);
 extern int memcmp(const void *a, const void *b, size_t len);
 extern size_t strlen(const char *s);

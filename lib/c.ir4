@@ -1,0 +1,150 @@
+require "stdio.ir4"
+require "mem.ir4"
+require "math.ir4"
+
+var __c_pa :a
+var __c_pb :a
+
+fn __c_word_bytes ( -> :i )
+  & __c_pb & __c_pa adiff
+end
+
+fn __c_putchar ( c :i -> :i )
+  c dup xemit
+end
+
+fn puts ( s :a -> :i )
+  s type0
+  cr
+  0
+end
+
+fn strlen ( s :a -> :i )
+  var n :i
+  0 -> n
+  begin
+    s u8@ 0 <>
+  while
+    s 1 a+ -> s
+    n 1 + -> n
+  repeat
+  n
+end
+
+fn strcmp ( a :a b :a -> :i )
+  var ca :i
+  var cb :i
+  begin
+    a u8@ -> ca
+    b u8@ -> cb
+    ca 0 <> ca cb = and
+  while
+    a 1 a+ -> a
+    b 1 a+ -> b
+  repeat
+  ca cb -
+end
+
+fn strcpy ( dst :a src :a -> :a )
+  var p :a
+  var c :i
+  dst -> p
+  begin
+    src u8@ -> c
+    c p i8!
+    c 0 <>
+  while
+    src 1 a+ -> src
+    p 1 a+ -> p
+  repeat
+  dst
+end
+
+fn __c_memcpy ( dst :a src :a len :i -> :a )
+  dst src len memcpy
+  dst
+end
+
+fn memset ( dst :a val :i len :i -> :a )
+  dst len val fillchar
+  dst
+end
+
+fn malloc ( bytes :i -> :a )
+  bytes heap_alloc
+end
+
+fn free ( p :a )
+  p heap_free
+end
+
+fn __c_puthex_u ( n :i upper :i )
+  var d :i
+  n 15 u> if n 4 u>> upper __c_puthex_u then
+  n 15 and -> d
+  d 10 < if
+    d 48 + xemit
+  else
+    upper if d 55 + xemit else d 87 + xemit then
+  then
+end
+
+fn printf ( fmt :a va :a -> :i )
+  var c :i
+  var cnt :i
+  var wsz :i
+  var s :a
+  0 -> cnt
+  __c_word_bytes -> wsz
+  begin
+    fmt u8@ -> c
+    c 0 <>
+  while
+    c 37 = if
+      fmt 1 a+ -> fmt
+      fmt u8@ -> c
+      c 0 = if cnt return then
+      c 37 = if
+        37 xemit cnt 1 + -> cnt
+      else c 99 = if
+        va @ xemit
+        va wsz a+ -> va
+        cnt 1 + -> cnt
+      else c 115 = if
+        va a@ -> s
+        begin
+          s u8@ -> c
+          c 0 <>
+        while
+          c xemit
+          s 1 a+ -> s
+          cnt 1 + -> cnt
+        repeat
+        va wsz a+ -> va
+      else c 100 = c 105 = or if
+        va @ typei
+        va wsz a+ -> va
+        cnt 1 + -> cnt
+      else c 117 = if
+        va @ typeu
+        va wsz a+ -> va
+        cnt 1 + -> cnt
+      else c 120 = if
+        va @ 0 __c_puthex_u
+        va wsz a+ -> va
+        cnt 1 + -> cnt
+      else c 88 = if
+        va @ 1 __c_puthex_u
+        va wsz a+ -> va
+        cnt 1 + -> cnt
+      else
+        37 xemit c xemit cnt 2 + -> cnt
+      then then then then then then then
+    else
+      c xemit
+      cnt 1 + -> cnt
+    then
+    fmt 1 a+ -> fmt
+  repeat
+  cnt
+end
